@@ -106,11 +106,12 @@ architecture rtl of usb_sync is
 begin
 
     reset <= not reset_n;
-
+    
     --------------------------------------------------------------------
     -- Bidirectional USB data bus
     --------------------------------------------------------------------
-    usb_data <= usb_data_out when usb_data_oe = '1' else (others => 'Z');
+    --usb_data <= usb_data_out when usb_data_oe = '1' else (others => 'Z');
+    usb_data <= (others => 'Z');  -- FPGA never drives bus
     usb_data_in <= usb_data;
 
     --------------------------------------------------------------------
@@ -130,7 +131,8 @@ begin
         );
 
     rx_empty <= rx_fifo_empty;
-
+    
+    usb_wr_n <= '1'; -- when tx is implemented delete this    
     --------------------------------------------------------------------
     -- TX FIFO: user 40 MHz write, FTDI 60 MHz read
     --------------------------------------------------------------------
