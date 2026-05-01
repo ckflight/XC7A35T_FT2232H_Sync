@@ -1,0 +1,5 @@
+xpm_cdc.sv,systemverilog,xpm,../../../../../tools/2025.2/data/ip/xpm/xpm_cdc/hdl/xpm_cdc.sv,incdir="../../../../../../../../../../../tools/2025.2/data/rsb/busdef"incdir="../../../../XC7A35T_FT2232H_Sync.gen/sources_1/ip/ila_0/hdl/verilog"
+xpm_memory.sv,systemverilog,xpm,../../../../../tools/2025.2/data/ip/xpm/xpm_memory/hdl/xpm_memory.sv,incdir="../../../../../../../../../../../tools/2025.2/data/rsb/busdef"incdir="../../../../XC7A35T_FT2232H_Sync.gen/sources_1/ip/ila_0/hdl/verilog"
+xpm_VCOMP.vhd,vhdl,xpm,../../../../../tools/2025.2/data/ip/xpm/xpm_VCOMP.vhd,incdir="../../../../../../../../../../../tools/2025.2/data/rsb/busdef"incdir="../../../../XC7A35T_FT2232H_Sync.gen/sources_1/ip/ila_0/hdl/verilog"
+ila_0.vhd,vhdl,xil_defaultlib,../../../../XC7A35T_FT2232H_Sync.gen/sources_1/ip/ila_0/sim/ila_0.vhd,incdir="../../../../../../../../../../../tools/2025.2/data/rsb/busdef"incdir="../../../../XC7A35T_FT2232H_Sync.gen/sources_1/ip/ila_0/hdl/verilog"
+glbl.v,Verilog,xil_defaultlib,glbl.v
