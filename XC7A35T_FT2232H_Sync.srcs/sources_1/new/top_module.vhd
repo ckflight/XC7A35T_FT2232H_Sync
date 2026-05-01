@@ -16,6 +16,8 @@ entity top_module is
         usb_oe_n    : out   std_logic;
         usb_rd_n    : out   std_logic;
         usb_wr_n    : out   std_logic;
+        
+        usb_siwua   : out   std_logic;
 
         -- Optional debug LED
         led         : out std_logic
@@ -103,7 +105,9 @@ architecture rtl of top_module is
     signal s_ila0_probe4 : std_logic_vector(31 downto 0);
 
 begin
-
+    
+    usb_siwua <= '1';
+    
     led <= s_led;
 
     usb_oe_n <= s_usb_oe_n;
