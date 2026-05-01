@@ -18,6 +18,7 @@ entity top_module is
         usb_wr_n    : out   std_logic;
         
         usb_siwua   : out   std_logic;
+        usb_suspend : in   std_logic;
 
         -- Optional debug LED
         led         : out std_logic
@@ -57,12 +58,13 @@ architecture rtl of top_module is
     
     component ila_0 is
     port(
-        clk     : IN STD_LOGIC;
+        clk    : IN STD_LOGIC;
         probe0 : IN STD_LOGIC_VECTOR(0 DOWNTO 0);
         probe1 : IN STD_LOGIC_VECTOR(0 DOWNTO 0);
         probe2 : IN STD_LOGIC_VECTOR(7 DOWNTO 0);
         probe3 : IN STD_LOGIC_VECTOR(7 DOWNTO 0);
-        probe4 : IN STD_LOGIC_VECTOR(31 DOWNTO 0)        
+        probe4 : IN STD_LOGIC_VECTOR(31 DOWNTO 0);
+        probe5 : IN STD_LOGIC_VECTOR(0 DOWNTO 0)        
     );
     end component;
 
@@ -103,10 +105,11 @@ architecture rtl of top_module is
     signal s_ila0_probe2 : std_logic_vector(7 downto 0);
     signal s_ila0_probe3 : std_logic_vector(7 downto 0);
     signal s_ila0_probe4 : std_logic_vector(31 downto 0);
+    signal s_ila0_probe5 : std_logic_vector(0 downto 0);
 
 begin
     
-    usb_siwua <= '1';
+    usb_siwua <= '0';
     
     led <= s_led;
 
@@ -119,7 +122,9 @@ begin
     s_ila0_probe2 <= read_fifo_data;
     s_ila0_probe3 <= rx_data;
     
-    s_ila0_probe4 <= std_logic_vector(byte_count); 
+    s_ila0_probe4 <= std_logic_vector(byte_count);
+    
+    s_ila0_probe5(0) <= usb_suspend; 
         
     --------------------------------------------------------------------
     -- Instantiate your usb_sync module
@@ -155,7 +160,8 @@ begin
         probe1 => s_ila0_probe1,
         probe2 => s_ila0_probe2,
         probe3 => s_ila0_probe3,
-        probe4 => s_ila0_probe4
+        probe4 => s_ila0_probe4,
+        probe5 => s_ila0_probe5
     );
    
     --------------------------------------------------------------------

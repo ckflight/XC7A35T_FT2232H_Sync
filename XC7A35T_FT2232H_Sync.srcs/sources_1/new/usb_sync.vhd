@@ -36,6 +36,7 @@ architecture rtl of usb_sync is
     --------------------------------------------------------------------
     -- Inout bus control
     --------------------------------------------------------------------
+    
     signal usb_data_out : std_logic_vector(7 downto 0) := (others => '0');
     signal usb_data_in  : std_logic_vector(7 downto 0);
     signal usb_data_oe  : std_logic := '0'; -- 1 = FPGA drives bus
@@ -107,13 +108,12 @@ begin
 
     reset <= not reset_n;
     
-    --------------------------------------------------------------------
-    -- Bidirectional USB data bus
-    --------------------------------------------------------------------
     --usb_data <= usb_data_out when usb_data_oe = '1' else (others => 'Z');
     usb_data <= (others => 'Z');  -- FPGA never drives bus
     usb_data_in <= usb_data;
 
+    usb_wr_n <= '1'; -- when tx is implemented delete this    
+    
     --------------------------------------------------------------------
     -- RX FIFO: FTDI 60 MHz write, user 40 MHz read
     --------------------------------------------------------------------
@@ -132,7 +132,6 @@ begin
 
     rx_empty <= rx_fifo_empty;
     
-    usb_wr_n <= '1'; -- when tx is implemented delete this    
     --------------------------------------------------------------------
     -- TX FIFO: user 40 MHz write, FTDI 60 MHz read
     --------------------------------------------------------------------
