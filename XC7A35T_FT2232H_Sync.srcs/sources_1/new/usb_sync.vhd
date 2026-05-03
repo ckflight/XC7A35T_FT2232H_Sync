@@ -22,10 +22,8 @@ entity usb_sync is
 
         usb_oe_n        : out std_logic;
         usb_rd_n        : out std_logic;
-        usb_wr_n        : out std_logic;
+        usb_wr_n        : out std_logic
         
-        ext_oe_debug    : out std_logic; -- oe is not driven so i will use external pin to check with scope
-        ext_rd_debug    : out std_logic
     );
 end usb_sync;
 
@@ -117,7 +115,7 @@ begin
 
             usb_oe_n <= '1';
             usb_rd_n <= '1';
-            ext_oe_debug <= '1';
+
 
             rx_fifo_din   <= (others => '0');
             rx_fifo_wr_en <= '0';
@@ -133,8 +131,6 @@ begin
                 when RX_IDLE =>
                     usb_oe_n <= '1';
                     usb_rd_n <= '1';
-                    ext_oe_debug <= '1';
-                    ext_rd_debug <= '1';
 
                     -- ft2232h drives rxf = 0 to indicate reception
                     if usb_rxf_n = '0' and rx_fifo_full = '0' then
@@ -146,9 +142,7 @@ begin
                     
                     -- Drive oe low to get the first byte
                     usb_oe_n <= '0';
-                    ext_oe_debug <= '0';
                     usb_rd_n <= '1'; -- rd is for burst read after reading the first byte
-                    ext_rd_debug <= '1';
                     
                     rx_state <= RX_SAMPLE_D0;
                 
@@ -156,9 +150,7 @@ begin
                     
                     -- keep oe low for burst reading on the next cycles with rd = 0
                     usb_oe_n <= '0';
-                    ext_oe_debug <= '0';
                     usb_rd_n <= '1';
-                    ext_rd_debug <= '1';
                     
                     if usb_rxf_n = '0' and rx_fifo_full = '0' then
                         
@@ -175,27 +167,21 @@ begin
                 when RX_ASSERT_RD =>
                     
                     usb_oe_n <= '0';
-                    ext_oe_debug <= '0';
                     usb_rd_n <= '0';
-                    ext_rd_debug <= '0';
                     
                     --rx_state <= RX_WAIT_D1;
                     rx_state <= RX_SAMPLE_BURST;
                 
                 when RX_WAIT_D1 =>
                     usb_oe_n <= '0';
-                    ext_oe_debug <= '0';
                     usb_rd_n <= '0';
-                    ext_rd_debug <= '0';
-                    
+                                        
                     rx_state <= RX_SAMPLE_BURST;
                    
                 when RX_SAMPLE_BURST =>
                     
                     usb_oe_n <= '0';
-                    ext_oe_debug <= '0';
                     usb_rd_n <= '0';
-                    ext_rd_debug <= '0';
                     
                     if usb_rxf_n = '0' and rx_fifo_full = '0' then
                         rx_fifo_din   <= usb_data;
@@ -206,9 +192,8 @@ begin
                 
                 when RX_FINISH =>
                     usb_oe_n <= '1';
-                    ext_oe_debug <= '1';
                     usb_rd_n <= '1';
-                    ext_rd_debug <= '1';
+
                     rx_state <= RX_IDLE;
                 
             end case;
