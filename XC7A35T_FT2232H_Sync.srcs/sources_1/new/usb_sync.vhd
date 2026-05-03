@@ -22,8 +22,7 @@ entity usb_sync is
 
         usb_oe_n        : out std_logic;
         usb_rd_n        : out std_logic;
-        usb_wr_n        : out std_logic
-        
+        usb_wr_n        : out std_logic        
     );
 end usb_sync;
 
@@ -51,7 +50,6 @@ architecture rtl of usb_sync is
         RX_ASSERT_OE,
         RX_SAMPLE_D0,
         RX_ASSERT_RD,
-        RX_WAIT_D1,
         RX_SAMPLE_BURST,
         RX_FINISH
     );
@@ -169,14 +167,7 @@ begin
                     usb_oe_n <= '0';
                     usb_rd_n <= '0';
                     
-                    --rx_state <= RX_WAIT_D1;
-                    rx_state <= RX_SAMPLE_BURST;
-                
-                when RX_WAIT_D1 =>
-                    usb_oe_n <= '0';
-                    usb_rd_n <= '0';
-                                        
-                    rx_state <= RX_SAMPLE_BURST;
+                    rx_state <= RX_SAMPLE_BURST;               
                    
                 when RX_SAMPLE_BURST =>
                     
@@ -191,11 +182,16 @@ begin
                     end if;
                 
                 when RX_FINISH =>
+                
                     usb_oe_n <= '1';
                     usb_rd_n <= '1';
-
-                    rx_state <= RX_IDLE;
                 
+                    if usb_rxf_n = '0' and rx_fifo_full = '0' then
+                        rx_state <= RX_ASSERT_OE;
+                    else
+                        rx_state <= RX_IDLE;
+                    end if;
+                        
             end case;
         end if;
     end process;
