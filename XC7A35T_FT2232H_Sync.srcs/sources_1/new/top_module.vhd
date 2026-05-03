@@ -3,9 +3,8 @@ use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.NUMERIC_STD.ALL;
 
 -- IMPORTANT NOTES:
--- Probes are usable when their clock is working. Since usb clockout is generate once the python script send command to ft2232h to work in sync mode
--- ILA Probes are not visible after loading the bit file. So run fmcw3_usb_test in radar folder. Then refresh target probes are visible!!!
--- Also logic is working but ft2232h might be faulty fpga cannot drive oe and rd pins. I will desolder ic and try those pins. 
+-- Probes are usable when their clock is working. Usb clockout is generate once the python script send command to ft2232h to work in sync mode
+-- So run fmcw3_usb_test in radar folder. Then refresh target probes are visible!!!
 
 entity top_module is
     port (
