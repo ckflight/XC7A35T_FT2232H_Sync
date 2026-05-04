@@ -14,7 +14,7 @@ entity usb_sync is
         rx_read_en      : in  std_logic;
 
         -- FT2232H side
-        usb_clkout      : in  std_logic;  -- 60 MHz from FT2232H
+        usb_clk         : in  std_logic;  -- 60 MHz from FT2232H
         usb_data        : in std_logic_vector(7 downto 0);
 
         usb_rxf_n       : in  std_logic;
@@ -29,18 +29,11 @@ end usb_sync;
 architecture rtl of usb_sync is
 
     --------------------------------------------------------------------
-    -- Inout bus control
-    --------------------------------------------------------------------
-    
-    signal usb_data_oe  : std_logic := '0'; -- 1 = FPGA drives bus
-
-    --------------------------------------------------------------------
     -- RX FIFO signals
     --------------------------------------------------------------------
     signal rx_fifo_din   : std_logic_vector(7 downto 0) := (others => '0');
     signal rx_fifo_wr_en : std_logic := '0';
     signal rx_fifo_full  : std_logic;
-    signal rx_fifo_empty : std_logic;
 
     --------------------------------------------------------------------
     -- RX FSM
@@ -48,7 +41,6 @@ architecture rtl of usb_sync is
     type rx_states_t is (
         RX_IDLE,
         RX_ASSERT_OE,
-        RX_SAMPLE_D0,
         RX_ASSERT_RD,
         RX_SAMPLE_BURST,
         RX_FINISH
@@ -89,23 +81,21 @@ begin
     rx_fifo_inst : fifo_generator_0
         port map (
             rst    => reset,
-            wr_clk => usb_clkout,
+            wr_clk => usb_clk,
             rd_clk => clk,
             din    => rx_fifo_din,
             wr_en  => rx_fifo_wr_en,
             rd_en  => rx_read_en,
             dout   => rx_data,
             full   => rx_fifo_full,
-            empty  => rx_fifo_empty
+            empty  => rx_empty
         );
-
-    rx_empty <= rx_fifo_empty;
     
     --------------------------------------------------------------------
     -- FT2232H RX FSM
     -- Reads from FTDI into RX FIFO
     --------------------------------------------------------------------
-    process(usb_clkout, reset_n)
+    process(usb_clk, reset_n)
     begin
         if reset_n = '0' then
 
@@ -118,7 +108,7 @@ begin
             rx_fifo_din   <= (others => '0');
             rx_fifo_wr_en <= '0';
 
-        elsif rising_edge(usb_clkout) then
+        elsif rising_edge(usb_clk) then
             
             -- this makes fifo write = 0 after it is enabled in fsm states
             rx_fifo_wr_en <= '0';
@@ -142,32 +132,15 @@ begin
                     usb_oe_n <= '0';
                     usb_rd_n <= '1'; -- rd is for burst read after reading the first byte
                     
-                    rx_state <= RX_SAMPLE_D0;
-                
-                when RX_SAMPLE_D0 =>
-                    
-                    -- keep oe low for burst reading on the next cycles with rd = 0
-                    usb_oe_n <= '0';
-                    usb_rd_n <= '1';
-                    
-                    if usb_rxf_n = '0' and rx_fifo_full = '0' then
-                        
-                        -- Get the first byte and write to fifo
-                        rx_fifo_din     <= usb_data;
-                        rx_fifo_wr_en   <= '1';
-                        
-                        -- rxf = 0 so more data
-                        rx_state <= RX_ASSERT_RD;
-                    else
-                        rx_state <= RX_IDLE;
-                    end if;
+                    --rx_state <= RX_SAMPLE_D0;
+                    rx_state <= RX_ASSERT_RD;                
                 
                 when RX_ASSERT_RD =>
                     
                     usb_oe_n <= '0';
                     usb_rd_n <= '0';
                     
-                    rx_state <= RX_SAMPLE_BURST;               
+                    rx_state <= RX_SAMPLE_BURST;    
                    
                 when RX_SAMPLE_BURST =>
                     

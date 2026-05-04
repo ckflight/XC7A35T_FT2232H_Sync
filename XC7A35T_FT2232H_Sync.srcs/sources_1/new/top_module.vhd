@@ -13,7 +13,7 @@ entity top_module is
         reset_n     : in  std_logic;
 
         -- FT2232H sync FIFO interface
-        usb_clkout  : in    std_logic; -- 60 MHz from FT2232H
+        usb_clk     : in    std_logic; -- 60 MHz from FT2232H
         usb_data    : in    std_logic_vector(7 downto 0);
         usb_rxf_n   : in    std_logic;
         usb_txe_n   : in    std_logic;
@@ -48,7 +48,7 @@ architecture rtl of top_module is
         rx_read_en      : in  std_logic;
 
         -- FT2232H side
-        usb_clkout      : in  std_logic;  -- 60 MHz from FT2232H
+        usb_clk         : in  std_logic;  -- 60 MHz from FT2232H
         usb_data        : in std_logic_vector(7 downto 0);
 
         usb_rxf_n       : in  std_logic;
@@ -72,7 +72,6 @@ architecture rtl of top_module is
     );
     end component;
     
-
     component ila_1 is
     PORT (
         clk     : IN STD_LOGIC;                
@@ -116,7 +115,7 @@ architecture rtl of top_module is
     
     -- usb signals
     signal s_usb_data      : std_logic_vector(7 downto 0) := (others => '0');
-    signal s_usb_clkout    : std_logic;
+    signal s_usb_clk       : std_logic;
     signal s_usb_rd_n      : std_logic;
     signal s_usb_wr_n      : std_logic;
     signal s_usb_oe_n      : std_logic;        
@@ -145,7 +144,7 @@ architecture rtl of top_module is
 
 begin
     
-    s_usb_clkout    <= usb_clkout;
+    s_usb_clk       <= usb_clk;
     s_usb_data      <= usb_data;    
     s_usb_rxf_n     <= usb_rxf_n;
     s_usb_txe_n     <= usb_txe_n;    
@@ -183,7 +182,7 @@ begin
         rx_empty    => rx_empty,
         rx_read_en  => rx_read_en,
 
-        usb_clkout  => s_usb_clkout,
+        usb_clk     => s_usb_clk,
         usb_data    => s_usb_data,
 
         usb_rxf_n   => usb_rxf_n,
@@ -208,7 +207,7 @@ begin
    
     ila_1_i : component ila_1
     port map(
-        clk     => s_usb_clkout,
+        clk     => s_usb_clk,
         probe0  => s_ila1_probe0,
         probe1  => s_ila1_probe1,
         probe2  => s_ila1_probe2,

@@ -1,8 +1,8 @@
 set_property -dict { PACKAGE_PIN N11   IOSTANDARD LVCMOS33 } [get_ports { clk_40mhz }];
 create_clock -add -name clk_40mhz -period 25.00 -waveform {0 12.5} [get_ports {clk_40mhz}]; # 40 MHz main clock
 
-set_property -dict { PACKAGE_PIN D13   IOSTANDARD LVCMOS33 } [get_ports { usb_clkout }]; # clock capable pin p not n
-create_clock -add -name usb_clkout -period 16.667 -waveform {0.000 8.333} [get_ports {usb_clkout}]; # 60 MHz main clock
+set_property -dict { PACKAGE_PIN D13   IOSTANDARD LVCMOS33 } [get_ports {usb_clk}]; # clock capable pin p not n
+create_clock -add -name usb_clk -period 16.667 -waveform {0.000 8.333} [get_ports {usb_clk}]; # 60 MHz main clock
 
 set_property -dict { PACKAGE_PIN B4   IOSTANDARD LVCMOS33 } [get_ports { reset_n }]; # rightmost button
 
