@@ -14,7 +14,7 @@ entity top_module is
 
         -- FT2232H sync FIFO interface
         usb_clk     : in    std_logic; -- 60 MHz from FT2232H
-        usb_data    : in    std_logic_vector(7 downto 0);
+        usb_data    : inout std_logic_vector(7 downto 0);
         usb_rxf_n   : in    std_logic;
         usb_txe_n   : in    std_logic;
         
@@ -42,21 +42,29 @@ architecture rtl of top_module is
         clk             : in  std_logic;  -- 40 MHz
         reset_n         : in  std_logic;
 
-        -- RX side to your logic
-        rx_data         : out std_logic_vector(7 downto 0);
-        rx_empty        : out std_logic;
-        rx_read_en      : in  std_logic;
+        -- RX side to logic
+        rx_fifo_dout    : out std_logic_vector(7 downto 0);       
+        rx_fifo_rd_en   : in  std_logic;
+        rx_fifo_empty   : out std_logic;
 
+        -- TX side to logic
+        tx_fifo_din     : in std_logic_vector(7 downto 0);
+        tx_fifo_wr_en   : in std_logic;
+        tx_fifo_full    : out std_logic;
+        
         -- FT2232H side
         usb_clk         : in  std_logic;  -- 60 MHz from FT2232H
-        usb_data        : in std_logic_vector(7 downto 0);
-
+        usb_data_in     : in  std_logic_vector(7 downto 0);
+        usb_data_out    : out std_logic_vector(7 downto 0);
+        is_usb_tx       : out std_logic; -- 1 FPGA drives data line, 0 data line High Z for reception
+        
         usb_rxf_n       : in  std_logic;
         usb_txe_n       : in  std_logic;
 
         usb_oe_n        : out std_logic;
         usb_rd_n        : out std_logic;
-        usb_wr_n        : out std_logic      
+        usb_wr_n        : out std_logic   
+           
     );
     end component;
     
@@ -87,9 +95,9 @@ architecture rtl of top_module is
     --------------------------------------------------------------------
     -- usb_sync RX interface
     --------------------------------------------------------------------
-    signal rx_data    : std_logic_vector(7 downto 0);
-    signal rx_empty   : std_logic;
-    signal rx_read_en : std_logic := '0';
+    signal rx_fifo_dout     : std_logic_vector(7 downto 0);
+    signal rx_fifo_empty    : std_logic;
+    signal rx_fifo_rd_en    : std_logic := '0';
     
     type read_usb_fifo_t is (
         FIFO_IDLE,
@@ -102,19 +110,22 @@ architecture rtl of top_module is
     --------------------------------------------------------------------
     -- usb_sync TX unused
     --------------------------------------------------------------------
-    signal tx_data     : std_logic_vector(7 downto 0) := (others => '0');
-    signal tx_full     : std_logic;
-    signal tx_write_en : std_logic := '0';
+    signal tx_fifo_din      : std_logic_vector(7 downto 0) := (others => '0');
+    signal tx_fifo_full     : std_logic;
+    signal tx_fifo_wr_en    : std_logic := '0';
 
     --------------------------------------------------------------------
     -- Debug registers for ILA
     --------------------------------------------------------------------
-    signal byte_count       : unsigned(31 downto 0) := (others => '0');
-    signal read_fifo_data   : std_logic_vector(7 downto 0) := (others => '0');
-    signal s_led            : std_logic := '0';
+    signal byte_count      : unsigned(31 downto 0) := (others => '0');
+    signal read_fifo_data  : std_logic_vector(7 downto 0) := (others => '0');
+    signal s_led           : std_logic := '0';
     
     -- usb signals
-    signal s_usb_data      : std_logic_vector(7 downto 0) := (others => '0');
+    signal s_usb_data_in    : std_logic_vector(7 downto 0);
+    signal s_usb_data_out   : std_logic_vector(7 downto 0);
+    signal s_is_usb_tx      : std_logic; -- 1 FPGA drives data line, 0 High Z
+    
     signal s_usb_clk       : std_logic;
     signal s_usb_rd_n      : std_logic;
     signal s_usb_wr_n      : std_logic;
@@ -145,7 +156,9 @@ architecture rtl of top_module is
 begin
     
     s_usb_clk       <= usb_clk;
-    s_usb_data      <= usb_data;    
+    usb_data        <= s_usb_data_out when s_is_usb_tx = '1' else (others => 'Z');
+    s_usb_data_in   <= usb_data;
+    
     s_usb_rxf_n     <= usb_rxf_n;
     s_usb_txe_n     <= usb_txe_n;    
     usb_siwua       <= '1';    
@@ -156,14 +169,14 @@ begin
     
     led <= s_led;
     
-    s_ila0_probe0(0)    <= rx_empty;
-    s_ila0_probe1(0)    <= rx_read_en;
-    s_ila0_probe2       <= rx_data;
+    s_ila0_probe0(0)    <= rx_fifo_empty;
+    s_ila0_probe1(0)    <= rx_fifo_rd_en;
+    s_ila0_probe2       <= rx_fifo_dout;
     s_ila0_probe3       <= read_fifo_data;
     s_ila0_probe4       <= std_logic_vector(byte_count);
     s_ila0_probe5(0)    <= usb_suspend; 
     
-    s_ila1_probe0       <= s_usb_data;
+    s_ila1_probe0       <= s_usb_data_in;
     s_ila1_probe1(0)    <= s_usb_rxf_n;
     s_ila1_probe2(0)    <= s_usb_oe_n;
     s_ila1_probe3(0)    <= s_usb_rd_n;
@@ -175,22 +188,28 @@ begin
     --------------------------------------------------------------------
     usb_sync_i : component usb_sync
     port map (
-        clk         => clk_40mhz,
-        reset_n     => reset_n,
+        clk             => clk_40mhz,
+        reset_n         => reset_n,
 
-        rx_data     => rx_data,
-        rx_empty    => rx_empty,
-        rx_read_en  => rx_read_en,
+        rx_fifo_dout   => rx_fifo_dout,
+        rx_fifo_empty  => rx_fifo_empty,
+        rx_fifo_rd_en  => rx_fifo_rd_en,
 
-        usb_clk     => s_usb_clk,
-        usb_data    => s_usb_data,
+        tx_fifo_din    => tx_fifo_din,
+        tx_fifo_wr_en  => tx_fifo_wr_en,
+        tx_fifo_full   => tx_fifo_full,
 
-        usb_rxf_n   => usb_rxf_n,
-        usb_txe_n   => usb_txe_n,
+        usb_clk         => s_usb_clk,
+        usb_data_in     => s_usb_data_in,
+        usb_data_out    => s_usb_data_out,
+        is_usb_tx       => s_is_usb_tx,
 
-        usb_oe_n    => s_usb_oe_n,
-        usb_rd_n    => s_usb_rd_n,
-        usb_wr_n    => s_usb_wr_n
+        usb_rxf_n       => usb_rxf_n,
+        usb_txe_n       => usb_txe_n,
+
+        usb_oe_n        => s_usb_oe_n,
+        usb_rd_n        => s_usb_rd_n,
+        usb_wr_n        => s_usb_wr_n
         
     );
     
@@ -222,7 +241,7 @@ begin
     process(clk_40mhz, reset_n)
     begin
         if reset_n = '0' then
-            rx_read_en      <= '0';
+            rx_fifo_rd_en   <= '0';
             read_fifo_data  <= (others => '0');
             byte_count      <= (others => '0');
             s_led           <= '0';
@@ -233,21 +252,21 @@ begin
                 
                 when FIFO_IDLE =>
                     
-                    if rx_empty = '0' then
+                    if rx_fifo_empty = '0' then
                         read_fifo_state <= FIFO_ASSERT_READ;                    
                     end if;
                 
                 when FIFO_ASSERT_READ =>
-                    rx_read_en      <= '1';
+                    rx_fifo_rd_en      <= '1';
                     read_fifo_state <= FIFO_READ_DATA;
                     
                     s_led <= '0';
                 
                 when FIFO_READ_DATA =>
                                         
-                    rx_read_en      <= '0';
+                    rx_fifo_rd_en      <= '0';
                     byte_count      <= byte_count + 1;                    
-                    read_fifo_data  <= rx_data;
+                    read_fifo_data  <= rx_fifo_dout;
                     
                     read_fifo_state <= FIFO_IDLE;
                     
