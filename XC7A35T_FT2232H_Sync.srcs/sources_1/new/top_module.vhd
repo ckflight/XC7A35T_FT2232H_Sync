@@ -14,7 +14,7 @@ entity top_module is
 
         -- FT2232H sync FIFO interface
         usb_clk     : in    std_logic; -- 60 MHz from FT2232H
-        usb_data    : in    std_logic_vector(7 downto 0);
+        usb_data    : inout std_logic_vector(7 downto 0);
         usb_rxf_n   : in    std_logic;
         usb_txe_n   : in    std_logic;
         
@@ -43,13 +43,19 @@ architecture rtl of top_module is
         reset_n         : in  std_logic;
 
         -- RX side to your logic
-        rx_data         : out std_logic_vector(7 downto 0);
-        rx_empty        : out std_logic;
-        rx_read_en      : in  std_logic;
+        rx_fifo_dout    : out std_logic_vector(7 downto 0);
+        rx_fifo_empty   : out std_logic;
+        rx_fifo_rd_en   : in  std_logic;
+
+        -- TX side to logic
+        tx_fifo_din     : in std_logic_vector(7 downto 0);
+        tx_fifo_wr_en   : in std_logic;
+        tx_fifo_full    : out std_logic;
 
         -- FT2232H side
         usb_clk         : in  std_logic;  -- 60 MHz from FT2232H
-        usb_data        : in std_logic_vector(7 downto 0);
+        usb_data        : inout std_logic_vector(7 downto 0);
+        usb_tx          : out std_logic;
 
         usb_rxf_n       : in  std_logic;
         usb_txe_n       : in  std_logic;
@@ -109,12 +115,15 @@ architecture rtl of top_module is
     --------------------------------------------------------------------
     -- Debug registers for ILA
     --------------------------------------------------------------------
-    signal byte_count       : unsigned(31 downto 0) := (others => '0');
-    signal read_fifo_data   : std_logic_vector(7 downto 0) := (others => '0');
-    signal s_led            : std_logic := '0';
+    signal byte_count      : unsigned(31 downto 0) := (others => '0');
+    signal read_fifo_data  : std_logic_vector(7 downto 0) := (others => '0');
+    signal s_led           : std_logic := '0';
     
     -- usb signals
-    signal s_usb_data      : std_logic_vector(7 downto 0) := (others => '0');
+    signal s_usb_data_in   : std_logic_vector(7 downto 0);
+    signal s_usb_data_out  : std_logic_vector(7 downto 0);
+    signal s_usb_data_tx   : std_logic; -- 1 FPGA drives data line, 0 High Z
+    
     signal s_usb_clk       : std_logic;
     signal s_usb_rd_n      : std_logic;
     signal s_usb_wr_n      : std_logic;
@@ -145,7 +154,9 @@ architecture rtl of top_module is
 begin
     
     s_usb_clk       <= usb_clk;
-    s_usb_data      <= usb_data;    
+    usb_data        <= s_usb_data_out when s_usb_data_tx = '1' else (others => 'Z');
+    s_usb_data_in   <= usb_data;
+    
     s_usb_rxf_n     <= usb_rxf_n;
     s_usb_txe_n     <= usb_txe_n;    
     usb_siwua       <= '1';    
@@ -163,7 +174,7 @@ begin
     s_ila0_probe4       <= std_logic_vector(byte_count);
     s_ila0_probe5(0)    <= usb_suspend; 
     
-    s_ila1_probe0       <= s_usb_data;
+    s_ila1_probe0       <= s_usb_data_in;
     s_ila1_probe1(0)    <= s_usb_rxf_n;
     s_ila1_probe2(0)    <= s_usb_oe_n;
     s_ila1_probe3(0)    <= s_usb_rd_n;
@@ -183,7 +194,8 @@ begin
         rx_read_en  => rx_read_en,
 
         usb_clk     => s_usb_clk,
-        usb_data    => s_usb_data,
+        usb_data    => usb_data,
+        usb_tx      => s_usb_data_tx,
 
         usb_rxf_n   => usb_rxf_n,
         usb_txe_n   => usb_txe_n,
