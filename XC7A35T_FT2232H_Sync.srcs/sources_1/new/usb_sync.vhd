@@ -4,7 +4,6 @@ use IEEE.NUMERIC_STD.ALL;
 
 entity usb_sync is
     port (
-        -- User/bus side clock
         clk             : in  std_logic;  -- 40 MHz
         reset_n         : in  std_logic;
 
@@ -85,9 +84,9 @@ architecture rtl of usb_sync is
     --------------------------------------------------------------------
     type tx_states_t is (
         TX_IDLE,
-        TX_ASSERT_OE,
-        TX_ASSERT_RD,
-        TX_SAMPLE_BURST,
+        TX_READ_FIFO,
+        TX_ASSERT_WRITE,
+        TX_DEASSERT_WRITE,
         TX_FINISH
     );
     
@@ -214,66 +213,76 @@ begin
 --    -- FT2232H TX FSM
 --    -- Sends TX FIFO bytes to FTDI
 --    --------------------------------------------------------------------
---    process(usb_clk, reset_n)
---    begin
---        if reset_n = '0' then
+    process(usb_clk, reset_n)
+    begin
+        if reset_n = '0' then
 
---            tx_state <= TX_IDLE;
+            tx_state <= TX_IDLE;
+    
+            usb_wr_n        <= '1';
+            tx_fifo_rd_en   <= '0';
+            usb_data_out    <= (others => '0');        
+            is_usb_tx       <= '0';                
 
---            usb_oe_n        <= '0';
---            usb_wr_n        <= '1';
---            tx_fifo_rd_en   <= '0';
---            usb_data_out    <= (others => '0');                        
+        elsif rising_edge(usb_clk) then
+            
+            -- this makes 0 for other states after enabled!!
+            tx_fifo_rd_en <= '0';
 
---        elsif rising_edge(usb_clk) then
+            case tx_state is
 
---            tx_fifo_rd_en <= '0';
+                when TX_IDLE =>
+                    usb_wr_n    <= '1';
+                    is_usb_tx   <= '0';
 
---            case tx_state is
+                    -- Only transmit when FTDI can accept data and TX FIFO has data and RX process is at idle
+                    if usb_txe_n = '0' and tx_fifo_empty = '0' and rx_state = RX_IDLE then
+                        tx_fifo_rd_en   <= '1'; -- read data from tx fifo
+                        tx_state        <= TX_READ_FIFO;
+                    end if;
 
---                when TX_IDLE =>
---                    usb_wr_n <= '1';
---                    usb_oe_n <= '0';
+                when TX_READ_FIFO =>
+                    
+                    usb_data_out <= tx_fifo_dout;
+                    
+                    is_usb_tx    <= '1';
+                    usb_wr_n     <= '1';
 
---                    -- Only transmit when FTDI can accept data and TX FIFO has data
---                    if usb_txe_n = '0' and tx_fifo_empty = '0' and rx_state = RX_IDLE then
---                        tx_fifo_rd_en <= '1';
---                        tx_state <= TX_LOAD;
---                    end if;
+                    tx_state <= TX_ASSERT_WRITE;
 
+                when TX_ASSERT_WRITE =>
+                    
+                    -- data is on usb bus start wrt
+                    is_usb_tx   <= '1';
+                    
+                    if usb_txe_n = '0' then
+                        usb_wr_n    <= '0';
+                        tx_state <= TX_DEASSERT_WRITE;
+                    end if;
+                
+                when TX_DEASSERT_WRITE =>
+                
+                    is_usb_tx   <= '1';
+                    usb_wr_n    <= '1';
+                    
+                    if tx_fifo_empty = '0' then
+                        tx_state <= TX_READ_FIFO;
+                        tx_fifo_rd_en   <= '1'; -- read data from tx fifo
 
---                when TX_LOAD =>
---                    -- FIFO output should now be valid
---                    usb_data_out <= tx_fifo_dout;
---                    usb_oe_n  <= '1';
---                    usb_wr_n     <= '1';
-
---                    tx_state <= TX_ASSERT_WR;
-
-
---                when TX_ASSERT_WR =>
---                    -- WR# low writes byte into FTDI
---                    usb_oe_n <= '1';
---                    usb_wr_n    <= '0';
-
---                    tx_state <= TX_DEASSERT_WR;
-
-
---                when TX_DEASSERT_WR =>
---                    -- Finish write pulse
---                    usb_oe_n <= '1';
---                    usb_wr_n    <= '1';
-
---                    if usb_txe_n = '0' and tx_fifo_empty = '0' then
---                        tx_fifo_rd_en <= '1';
---                        tx_state <= TX_LOAD;
---                    else
---                        usb_oe_n <= '0';
---                        tx_state <= TX_IDLE;
---                    end if;
-
---            end case;
---        end if;
---    end process;
+                    else
+                        tx_state <= TX_FINISH;                    
+                    end if;                    
+                
+                when TX_FINISH =>
+                
+                    is_usb_tx   <= '0';
+                    usb_wr_n    <= '1';
+                    
+                    tx_state <= TX_IDLE;
+                
+                
+            end case;
+        end if;
+    end process;
 
 end rtl;

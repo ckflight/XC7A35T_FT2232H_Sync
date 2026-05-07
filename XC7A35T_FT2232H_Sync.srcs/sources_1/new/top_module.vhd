@@ -38,7 +38,6 @@ architecture rtl of top_module is
 
     component usb_sync is
     port (
-        -- User/bus side clock
         clk             : in  std_logic;  -- 40 MHz
         reset_n         : in  std_logic;
 
@@ -63,7 +62,7 @@ architecture rtl of top_module is
 
         usb_oe_n        : out std_logic;
         usb_rd_n        : out std_logic;
-        usb_wr_n        : out std_logic   
+        usb_wr_n        : out std_logic  
            
     );
     end component;
@@ -209,8 +208,7 @@ begin
 
         usb_oe_n        => s_usb_oe_n,
         usb_rd_n        => s_usb_rd_n,
-        usb_wr_n        => s_usb_wr_n
-        
+        usb_wr_n        => s_usb_wr_n        
     );
     
     ila_0_i : component ila_0
