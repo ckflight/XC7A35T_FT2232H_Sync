@@ -85,6 +85,7 @@ architecture rtl of usb_sync is
     type tx_states_t is (
         TX_IDLE,
         TX_READ_FIFO,
+        TX_WAIT_FIFO,
         TX_ASSERT_WRITE,
         TX_DEASSERT_WRITE,
         TX_FINISH
@@ -214,74 +215,81 @@ begin
     process(usb_clk, reset_n)
     begin
         if reset_n = '0' then
-
-            tx_state <= TX_IDLE;
     
-            usb_wr_n        <= '1';
-            tx_fifo_rd_en   <= '0';
-            usb_data_out    <= (others => '0');        
-            is_usb_tx       <= '0';                
-
-        elsif rising_edge(usb_clk) then
-            
-            -- this makes 0 for other states after enabled!!
+            tx_state      <= TX_IDLE;
+            usb_wr_n      <= '1';
             tx_fifo_rd_en <= '0';
-
+            usb_data_out  <= (others => '0');
+            is_usb_tx     <= '0';
+    
+        elsif rising_edge(usb_clk) then
+    
+            tx_fifo_rd_en <= '0';
+    
             case tx_state is
-
+    
                 when TX_IDLE =>
-                    usb_wr_n    <= '1';
-                    is_usb_tx   <= '0';
-
-                    -- Only transmit when FTDI can accept data and TX FIFO has data and RX process is at idle
-                    if usb_txe_n = '0' and tx_fifo_empty = '0' and rx_state = RX_IDLE and usb_rxf_n = '1' then
-                        tx_fifo_rd_en   <= '1'; -- read data from tx fifo
-                        tx_state        <= TX_READ_FIFO;
+                    usb_wr_n  <= '1';
+                    is_usb_tx <= '0';
+    
+                    if usb_txe_n = '0'
+                       and tx_fifo_empty = '0'
+                       and rx_state = RX_IDLE
+                       and usb_rxf_n = '1' then
+    
+                        tx_fifo_rd_en <= '1';
+                        tx_state      <= TX_READ_FIFO;
                     end if;
-
+    
+    
                 when TX_READ_FIFO =>
-                    
+                    -- wait one clock after rd_en
+                    usb_wr_n  <= '1';
+                    is_usb_tx <= '0';
+                    tx_state  <= TX_WAIT_FIFO;
+    
+    
+                when TX_WAIT_FIFO =>
+                    -- now standard FIFO dout should be valid
                     usb_data_out <= tx_fifo_dout;
-                    
-                    is_usb_tx    <= '1';
                     usb_wr_n     <= '1';
-
-                    tx_state <= TX_ASSERT_WRITE;
-
+                    is_usb_tx    <= '1';
+                    tx_state     <= TX_ASSERT_WRITE;
+    
+    
                 when TX_ASSERT_WRITE =>
-                    
-                    -- data is on usb bus start wrt
-                    is_usb_tx   <= '1';
-                    
+                    is_usb_tx <= '1';
+    
                     if usb_txe_n = '0' then
-                        usb_wr_n    <= '0';
+                        usb_wr_n <= '0';
                         tx_state <= TX_DEASSERT_WRITE;
                     else
                         usb_wr_n <= '1';
                     end if;
-                
+    
+    
                 when TX_DEASSERT_WRITE =>
-                
-                    is_usb_tx   <= '1';
-                    usb_wr_n    <= '1';
-                    
-                    if usb_txe_n = '0' and tx_fifo_empty = '0' and rx_state = RX_IDLE and usb_rxf_n = '1' then
+                    usb_wr_n  <= '1';
+                    is_usb_tx <= '1';
+    
+                    if usb_txe_n = '0'
+                       and tx_fifo_empty = '0'
+                       and rx_state = RX_IDLE
+                       and usb_rxf_n = '1' then
+    
                         tx_fifo_rd_en <= '1';
                         tx_state      <= TX_READ_FIFO;
                     else
                         tx_state <= TX_FINISH;
-                    end if;                  
-                
+                    end if;
+    
+    
                 when TX_FINISH =>
-                
-                    is_usb_tx   <= '0';
-                    usb_wr_n    <= '1';
-                    
-                    tx_state <= TX_IDLE;
-                
-                
+                    usb_wr_n  <= '1';
+                    is_usb_tx <= '0';
+                    tx_state  <= TX_IDLE;
+    
             end case;
         end if;
     end process;
-
 end rtl;
