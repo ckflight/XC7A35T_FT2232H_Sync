@@ -142,7 +142,6 @@ begin
 
             usb_oe_n    <= '1';
             usb_rd_n    <= '1';
-            is_usb_tx   <= '0';
 
             rx_fifo_din   <= (others => '0');
             rx_fifo_wr_en <= '0';
@@ -158,7 +157,6 @@ begin
                 when RX_IDLE =>
                     usb_oe_n    <= '1';
                     usb_rd_n    <= '1';
-                    is_usb_tx   <= '0';
 
                     -- ft2232h drives rxf = 0 to indicate reception
                     if usb_rxf_n = '0' and rx_fifo_full = '0' and tx_state = TX_IDLE then
@@ -236,7 +234,7 @@ begin
                     is_usb_tx   <= '0';
 
                     -- Only transmit when FTDI can accept data and TX FIFO has data and RX process is at idle
-                    if usb_txe_n = '0' and tx_fifo_empty = '0' and rx_state = RX_IDLE then
+                    if usb_txe_n = '0' and tx_fifo_empty = '0' and rx_state = RX_IDLE and usb_rxf_n = '1' then
                         tx_fifo_rd_en   <= '1'; -- read data from tx fifo
                         tx_state        <= TX_READ_FIFO;
                     end if;
@@ -258,6 +256,8 @@ begin
                     if usb_txe_n = '0' then
                         usb_wr_n    <= '0';
                         tx_state <= TX_DEASSERT_WRITE;
+                    else
+                        usb_wr_n <= '1';
                     end if;
                 
                 when TX_DEASSERT_WRITE =>
@@ -265,13 +265,12 @@ begin
                     is_usb_tx   <= '1';
                     usb_wr_n    <= '1';
                     
-                    if tx_fifo_empty = '0' then
-                        tx_state <= TX_READ_FIFO;
-                        tx_fifo_rd_en   <= '1'; -- read data from tx fifo
-
+                    if usb_txe_n = '0' and tx_fifo_empty = '0' and rx_state = RX_IDLE and usb_rxf_n = '1' then
+                        tx_fifo_rd_en <= '1';
+                        tx_state      <= TX_READ_FIFO;
                     else
-                        tx_state <= TX_FINISH;                    
-                    end if;                    
+                        tx_state <= TX_FINISH;
+                    end if;                  
                 
                 when TX_FINISH =>
                 
