@@ -27,7 +27,9 @@ entity top_module is
         
 --        ext1        : out std_logic_vector(4 downto 0);
 --        ext2        : out std_logic_vector(5 downto 0);
-
+        
+        pa_en       : out std_logic;
+        mix_en      : out std_logic;
         -- Optional debug LED
         led         : out std_logic        
         
@@ -91,6 +93,16 @@ architecture rtl of top_module is
     );
     end component;
     
+    component ila_2 is
+    PORT (
+        clk     : IN STD_LOGIC;                
+        probe0  : IN STD_LOGIC_VECTOR(7 DOWNTO 0);
+        probe1  : IN STD_LOGIC_VECTOR(0 DOWNTO 0);
+        probe2  : IN STD_LOGIC_VECTOR(0 DOWNTO 0);
+        probe3  : IN STD_LOGIC_VECTOR(12 DOWNTO 0)
+    );
+    end component;    
+    
     --------------------------------------------------------------------
     -- usb_sync RX interface
     --------------------------------------------------------------------
@@ -99,13 +111,13 @@ architecture rtl of top_module is
     signal rx_fifo_rd_en    : std_logic := '0';
     
 -- RX ONLY
---    type read_usb_fifo_t is (
---        FIFO_IDLE,
---        FIFO_ASSERT_READ,
---        FIFO_READ_DATA
---    );
+    type read_usb_fifo_t is (
+        FIFO_IDLE,
+        FIFO_ASSERT_READ,
+        FIFO_READ_DATA
+    );
     
---    signal read_fifo_state : read_usb_fifo_t := FIFO_IDLE;
+    signal read_fifo_state : read_usb_fifo_t := FIFO_IDLE;
 
 -- ECHO
     type echo_state_t is (
@@ -116,23 +128,9 @@ architecture rtl of top_module is
     
     signal echo_state : echo_state_t := ECHO_IDLE;
 
--- TX ONLY
---    type tx_test_state_t is (
---        TXTEST_IDLE,
---        TXTEST_READ_CMD_WAIT,
---        TXTEST_BURST,
---        TXTEST_GAP
---    );
-    
---    signal tx_test_state  : tx_test_state_t := TXTEST_IDLE;
---    signal stream_counter : unsigned(7 downto 0) := (others => '0');
---    signal burst_count    : unsigned(12 downto 0) := (others => '0');
---    signal gap_count      : unsigned(18 downto 0) := (others => '0');
-    
---    constant BURST_SIZE_BYTES : unsigned(12 downto 0) := to_unsigned(512, 13);
-    
---    -- 10 ms gap at 40 MHz = 400,000 clocks
---    constant GAP_10MS_COUNT : unsigned(18 downto 0) := to_unsigned(400000, 19);
+-- TX ONLY    
+    signal stream_counter : unsigned(7 downto 0) := (others => '0');
+    signal tx_started     : std_logic := '0';
     
     --------------------------------------------------------------------
     -- usb_sync TX unused
@@ -179,6 +177,10 @@ architecture rtl of top_module is
     signal s_ila1_probe4 : std_logic_vector(0 downto 0);
     signal s_ila1_probe5 : std_logic_vector(0 downto 0);
     
+    signal s_ila2_probe0 : std_logic_vector(7 downto 0);
+    signal s_ila2_probe1 : std_logic_vector(0 downto 0);
+    signal s_ila2_probe2 : std_logic_vector(0 downto 0);
+    signal s_ila2_probe3 : std_logic_vector(12 downto 0);
 
 begin
     
@@ -196,6 +198,10 @@ begin
     
     led <= s_led;
     
+    pa_en <= '0';
+    
+    mix_en <= '1'; -- active low
+    
     s_ila0_probe0(0)    <= rx_fifo_empty;
     s_ila0_probe1(0)    <= rx_fifo_rd_en;
     s_ila0_probe2       <= rx_fifo_dout;
@@ -209,6 +215,11 @@ begin
     s_ila1_probe3(0)    <= s_usb_rd_n;
     s_ila1_probe4(0)    <= s_usb_txe_n;
     s_ila1_probe5(0)    <= s_usb_wr_n;
+    
+--    s_ila2_probe0       <= std_logic_vector(stream_counter);
+--    s_ila2_probe1(0)    <= tx_fifo_wr_en;
+--    s_ila2_probe2(0)    <= tx_fifo_full;
+--    s_ila2_probe3       <= std_logic_vector(burst_count);  
     
     --------------------------------------------------------------------
     -- Instantiate your usb_sync module
@@ -260,119 +271,63 @@ begin
         probe4  => s_ila1_probe4,
         probe5  => s_ila1_probe5
     );
+
+    ila_2_i : component ila_2
+    port map(
+        clk     => clk_40mhz,
+        probe0  => s_ila2_probe0,
+        probe1  => s_ila2_probe1,
+        probe2  => s_ila2_probe2,
+        probe3  => s_ila2_probe3
+    );
     
 --------------------------------------------------------------------------
 --      Tranmit data for benchmark test for python code TEST_TX_ONLY = 1
 --------------------------------------------------------------------------            
---    process(clk_40mhz)
+--    process(clk_40mhz, reset_n)
 --    begin
---        if rising_edge(clk_40mhz) then
+--        if reset_n = '0' then
     
---            -- default one-clock pulses
+--            rx_fifo_rd_en  <= '0';
+--            tx_fifo_wr_en  <= '0';
+--            tx_fifo_din    <= (others => '0');
+    
+--            stream_counter <= (others => '0');
+--            tx_started     <= '0';
+--            s_led          <= '0';
+    
+--        elsif rising_edge(clk_40mhz) then
+    
 --            rx_fifo_rd_en <= '0';
 --            tx_fifo_wr_en <= '0';
     
---            ----------------------------------------------------------------
---            -- synchronous reset
---            ----------------------------------------------------------------
---            if reset_n = '0' then
+--            -- consume one start byte from PC
+--            if tx_started = '0' then
     
---                rx_fifo_rd_en   <= '0';
---                tx_fifo_wr_en   <= '0';
---                tx_fifo_din     <= (others => '0');
+--                if rx_fifo_empty = '0' then
+--                    rx_fifo_rd_en  <= '1';
+--                    tx_started     <= '1';
+--                    stream_counter <= (others => '0');
+--                    s_led          <= '1';
+--                end if;
     
---                read_fifo_data  <= (others => '0');
-    
---                stream_counter  <= (others => '0');
---                burst_count     <= (others => '0');
---                gap_count       <= (others => '0');
-    
---                s_led           <= '0';
-    
---                tx_test_state   <= TXTEST_IDLE;
-    
+--            -- after start, continuously fill TX FIFO
 --            else
     
---                case tx_test_state is
-    
---                    --------------------------------------------------------
---                    -- wait for start command from PC
---                    --------------------------------------------------------
---                    when TXTEST_IDLE =>
-    
---                        s_led <= '0';
-    
---                        if rx_fifo_empty = '0' then
---                            rx_fifo_rd_en <= '1';
---                            tx_test_state <= TXTEST_READ_CMD_WAIT;
---                        end if;
-    
-    
---                    --------------------------------------------------------
---                    -- standard FIFO: command valid one clock later
---                    --------------------------------------------------------
---                    when TXTEST_READ_CMD_WAIT =>
-    
---                        stream_counter <= (others => '0');
---                        burst_count    <= (others => '0');
---                        gap_count      <= (others => '0');
-    
---                        tx_test_state <= TXTEST_BURST;
-    
-    
---                    --------------------------------------------------------
---                    -- send exactly 4096 bytes
---                    --------------------------------------------------------
---                    when TXTEST_BURST =>
-    
---                        s_led <= '1';
-    
---                        if burst_count < BURST_SIZE_BYTES then
-    
---                            if tx_fifo_full = '0' then
-    
---                                tx_fifo_din   <= std_logic_vector(stream_counter);
---                                tx_fifo_wr_en <= '1';
-    
---                                stream_counter <= stream_counter + 1;
---                                burst_count    <= burst_count + 1;
-    
---                            end if;
-    
---                        else
-    
---                            burst_count   <= (others => '0');
---                            gap_count     <= (others => '0');
-    
---                            tx_test_state <= TXTEST_GAP;
-    
---                        end if;
-    
-    
---                    --------------------------------------------------------
---                    -- wait 10 ms between bursts
---                    --------------------------------------------------------
---                    when TXTEST_GAP =>
-    
---                        s_led <= '0';
---                        stream_counter <= (others => '0');
-    
---                        if gap_count < GAP_10MS_COUNT then
---                            gap_count <= gap_count + 1;
---                        else
---                            gap_count <= (others => '0');
---                            tx_test_state <= TXTEST_BURST;
---                        end if;
-    
---                end case;
+--                if tx_fifo_full = '0' then
+--                    tx_fifo_din    <= std_logic_vector(stream_counter);
+--                    tx_fifo_wr_en  <= '1';
+--                    stream_counter <= stream_counter + 1;
+--                end if;
     
 --            end if;
+    
 --        end if;
 --    end process;
     
 --------------------------------------------------------------------------
 --      Tranmit Received data for echo and benchmark test for python code TEST_BENCHMARK = 1
---------------------------------------------------------------------------        
+------------------------------------------------------------------------        
     process(clk_40mhz, reset_n)
     begin
         if reset_n = '0' then
