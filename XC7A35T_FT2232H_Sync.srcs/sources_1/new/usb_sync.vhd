@@ -16,6 +16,8 @@ entity usb_sync is
         tx_fifo_din     : in std_logic_vector(7 downto 0);
         tx_fifo_wr_en   : in std_logic;
         tx_fifo_full    : out std_logic;
+        tx_fifo_wr_ack  : out std_logic;
+        tx_fifo_wr_ovf  : out std_logic;
         
         -- FT2232H side
         usb_clk         : in  std_logic;  -- 60 MHz from FT2232H
@@ -50,6 +52,25 @@ architecture rtl of usb_sync is
             full    : out std_logic;
             empty   : out std_logic
         );
+    end component;
+    
+    -- fall through for tx
+    component fifo_generator_1
+    port (
+        rst     : in  std_logic;
+        wr_clk  : in  std_logic;
+        rd_clk  : in  std_logic;
+        din     : in  std_logic_vector(7 downto 0);
+        wr_en   : in  std_logic;
+        rd_en   : in  std_logic;
+        dout    : out std_logic_vector(7 downto 0);
+        full    : out std_logic;
+        wr_ack : OUT STD_LOGIC;
+        overflow : OUT STD_LOGIC;
+        empty   : out std_logic;
+        valid   : out STD_LOGIC
+
+    );
     end component;
     
     component ila_3 is
@@ -90,10 +111,13 @@ architecture rtl of usb_sync is
     signal s_tx_fifo_dout   : std_logic_vector(7 downto 0) := (others => '0');
     signal s_tx_fifo_rd_en  : std_logic := '0';
     signal s_tx_fifo_empty  : std_logic;
+    signal s_tx_fifo_valid  : std_logic;
 
     --------------------------------------------------------------------
     -- TX FSM
     --------------------------------------------------------------------
+--    Commented tx fsm states
+
     type tx_states_t is (
         TX_IDLE,
         TX_READ_FIFO,
@@ -103,6 +127,8 @@ architecture rtl of usb_sync is
     );
     
     signal tx_state : tx_states_t := TX_IDLE;
+    
+    signal tx_data_reg : std_logic_vector(7 downto 0) := (others => '0');
     
     signal reset : std_logic;
     
@@ -129,7 +155,7 @@ begin
     s_usb_txe_n <= usb_txe_n;
     
     usb_wr_n <= s_usb_wr_n;
-                
+                    
     s_ila3_probe0       <= s_usb_data_out;
     s_ila3_probe1(0)    <= s_tx_fifo_rd_en;
     s_ila3_probe2(0)    <= s_tx_fifo_empty;
@@ -168,7 +194,7 @@ begin
     --------------------------------------------------------------------
     -- TX FIFO: FTDI 40 MHz write, 60 MHz read for usb tx
     --------------------------------------------------------------------
-    tx_fifo_inst : fifo_generator_0
+    tx_fifo_inst : fifo_generator_1
         port map (
             rst    => reset,
             wr_clk => clk,
@@ -178,7 +204,10 @@ begin
             rd_en  => s_tx_fifo_rd_en,
             dout   => s_tx_fifo_dout,
             full   => tx_fifo_full,
-            empty  => s_tx_fifo_empty
+            wr_ack => tx_fifo_wr_ack,
+            overflow => tx_fifo_wr_ovf,
+            empty  => s_tx_fifo_empty,
+            valid  => s_tx_fifo_valid
         );
     
     --------------------------------------------------------------------
@@ -262,6 +291,9 @@ begin
 --    -- FT2232H TX FSM
 --    -- Sends TX FIFO bytes to FTDI
 --    --------------------------------------------------------------------
+--    This fsm works with echo benchmark but fails with tx only. Wr should stay low during burst write so another fsm will be written
+--    Also this one uses fsm as standard fifo
+--    Most close to working one. Has a one byte drop issue.
     process(usb_clk, reset_n)
     begin
         if reset_n = '0' then
@@ -297,12 +329,14 @@ begin
     
     
                 when TX_ONE_CLOCK =>
-                    s_usb_data_out <= s_tx_fifo_dout;
-
                     s_usb_wr_n      <= '1';
                     s_is_usb_tx     <= '0';
-                    tx_state        <= TX_ASSERT_WRITE;
-                
+                    
+                    if s_tx_fifo_valid = '1' then
+                        s_usb_data_out <= s_tx_fifo_dout;
+
+                        tx_state        <= TX_ASSERT_WRITE;
+                    end if;
     
                 when TX_ASSERT_WRITE =>
                     s_is_usb_tx <= '1';
@@ -324,7 +358,9 @@ begin
             end case;
         end if;
     end process;
-    
+
+
+   
     
     
     
