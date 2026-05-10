@@ -97,7 +97,7 @@ architecture rtl of usb_sync is
     type tx_states_t is (
         TX_IDLE,
         TX_READ_FIFO,
-        TX_WAIT_FIFO,
+        TX_ONE_CLOCK,
         TX_ASSERT_WRITE,
         TX_DEASSERT_WRITE
     );
@@ -284,24 +284,23 @@ begin
     
                     if s_usb_txe_n = '0' and s_tx_fifo_empty = '0' and rx_state = RX_IDLE and usb_rxf_n = '1' then
                         s_tx_fifo_rd_en <= '1';
-                        tx_state      <= TX_READ_FIFO;
+                        tx_state        <= TX_READ_FIFO;
                     end if;
     
 
                 when TX_READ_FIFO =>
-                    -- wait one clock after rd_en
+                    -- READING FIFO HERE DOES NOT WORK!!!
                     s_usb_wr_n  <= '1';
-                    s_is_usb_tx <= '1';
+                    s_is_usb_tx <= '0';
                     
-                    tx_state  <= TX_WAIT_FIFO;
+                    tx_state  <= TX_ONE_CLOCK;
     
     
-                when TX_WAIT_FIFO =>
-                    -- now standard FIFO dout should be valid
+                when TX_ONE_CLOCK =>
                     s_usb_data_out <= s_tx_fifo_dout;
 
                     s_usb_wr_n      <= '1';
-                    s_is_usb_tx     <= '1';
+                    s_is_usb_tx     <= '0';
                     tx_state        <= TX_ASSERT_WRITE;
                 
     
