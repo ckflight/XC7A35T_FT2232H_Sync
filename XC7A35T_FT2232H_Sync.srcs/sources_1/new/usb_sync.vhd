@@ -37,8 +37,7 @@ end usb_sync;
 architecture rtl of usb_sync is
 
     --------------------------------------------------------------------
-    -- Dual-clock FIFO component
-    -- Replace fifo_generator_0 with your Xilinx FIFO IP name.
+    -- Dual-clock FIFO components both standard fifo. I created 2 components since tx needs more buffer
     --------------------------------------------------------------------
     component fifo_generator_0
         port (
@@ -54,7 +53,6 @@ architecture rtl of usb_sync is
         );
     end component;
     
-    -- fall through for tx
     component fifo_generator_1
     port (
         rst     : in  std_logic;
@@ -291,9 +289,6 @@ begin
 --    -- FT2232H TX FSM
 --    -- Sends TX FIFO bytes to FTDI
 --    --------------------------------------------------------------------
---    This fsm works with echo benchmark but fails with tx only. Wr should stay low during burst write so another fsm will be written
---    Also this one uses fsm as standard fifo
---    Most close to working one. Has a one byte drop issue.
     process(usb_clk, reset_n)
     begin
         if reset_n = '0' then

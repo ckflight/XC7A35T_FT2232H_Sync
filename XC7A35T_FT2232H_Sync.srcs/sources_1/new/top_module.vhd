@@ -137,18 +137,14 @@ architecture rtl of top_module is
         TXTEST_IDLE,
         TXTEST_READ_CMD_WAIT,
         TXTEST_BURST,
-        TXTEST_WAIT_ACK,
-        TXTEST_GAP
+        TXTEST_WAIT_ACK
     );
     
     signal tx_test_state        : tx_test_state_t := TXTEST_IDLE;
     signal stream_counter       : unsigned(7 downto 0) := (others => '0');
     signal burst_count          : unsigned(12 downto 0) := (others => '0');
-    signal gap_count            : unsigned(18 downto 0) := (others => '0');
     
-    constant BURST_SIZE_BYTES   : unsigned(15 downto 0) := to_unsigned(1024, 16);
-    constant GAP_COUNT_MAX      : unsigned(18 downto 0) := to_unsigned(400, 19); -- 4000 -> 100 us
-    
+    constant BURST_SIZE_BYTES   : unsigned(15 downto 0) := to_unsigned(1024, 16); -- 512, 1024, 2048 is about 11 MB/sec max for now. 4096 is 9 MB/sec
     constant BURST_REPEAT       : unsigned(15 downto 0) := to_unsigned(125, 16);
     signal burst_repeat_count   : unsigned(15 downto 0) := (others => '0');
     
@@ -332,7 +328,6 @@ begin
     
                 stream_counter <= (others => '0');
                 burst_count    <= (others => '0');
-                gap_count      <= (others => '0');
     
                 s_led          <= '0';
                 tx_test_state  <= TXTEST_IDLE;
@@ -361,7 +356,6 @@ begin
     
                         stream_counter <= (others => '0');
                         burst_count    <= (others => '0');
-                        gap_count      <= (others => '0');
     
                         tx_test_state <= TXTEST_BURST;
     
@@ -391,11 +385,10 @@ begin
                         else
 
                             burst_count <= (others => '0');
-                            gap_count   <= (others => '0');
                         
-                            if burst_repeat_count < BURST_REPEAT - 1 then
+                            if burst_repeat_count < BURST_REPEAT then
                                 burst_repeat_count <= burst_repeat_count + 1;
-                                tx_test_state <= TXTEST_GAP;
+                                tx_test_state <= TXTEST_BURST;
                             else
                                 -- finished 125 bursts
                                 burst_repeat_count <= (others => '0');
@@ -418,22 +411,7 @@ begin
                             tx_test_state <= TXTEST_BURST;
                     
                         end if;
-    
-    
-                    --------------------------------------------------------
-                    -- gap between bursts
-                    --------------------------------------------------------
-                    when TXTEST_GAP =>
-    
-                        s_led <= '0';
-                        stream_counter <= (others => '0');
-    
-                        if gap_count < GAP_COUNT_MAX then
-                            gap_count <= gap_count + 1;
-                        else
-                            gap_count <= (others => '0');
-                            tx_test_state <= TXTEST_BURST;
-                        end if;
+
     
                 end case;
     
